@@ -5,8 +5,8 @@ using AutoMapper;
 using Domain.Abstractions;
 using MediatR;
 using Domain.Enum;
-using Infra.Repository.UnitOfWork;
 using Domain.Entity;
+using Infra.Repository.UnitOfWork;
 
 namespace Application.UserCQ.Handlers
 {

@@ -3,22 +3,22 @@ using Application.UserCQ.Commands;
 using Application.UserCQ.ViewModels;
 using AutoMapper;
 using Domain.Abstractions;
-using Infra.Persistence;
+using Infra.Repository.UnitOfWork;
 using MediatR;
 using Microsoft.Extensions.Configuration;
 
 namespace Application.UserCQ.Handlers
 {
-    public class RefreshTokenCommandHandler(TasksDbContext context, IAuthService authService, IConfiguration configuration, IMapper mapper) : IRequestHandler<RefreshTokenCommand, ResponseBase<RefreshTokenViewModel>>
+    public class RefreshTokenCommandHandler(IUnitOfWork unitOfWork, IAuthService authService, IConfiguration configuration, IMapper mapper) : IRequestHandler<RefreshTokenCommand, ResponseBase<RefreshTokenViewModel>>
     {
-        private readonly TasksDbContext _context = context;
+        private readonly IUnitOfWork _unitOfWork = unitOfWork;
         private readonly IAuthService _authService = authService;
         private readonly IConfiguration _configuration = configuration;
         private readonly IMapper _mapper = mapper;
 
         public async Task<ResponseBase<RefreshTokenViewModel>> Handle(RefreshTokenCommand request, CancellationToken cancellationToken)
         {
-            var user = _context.Users.FirstOrDefault(x => x.Username == request.Username);
+            var user = await _unitOfWork.UserRepository.Get(x => x.Username == request.Username);
 
             if (user is null || user.RefreshToken != request.RefreshToken || user.RefreshTokenExpirationTime < DateTime.Now)
             {
@@ -37,7 +37,8 @@ namespace Application.UserCQ.Handlers
             user.RefreshToken = _authService.GenerateRefreshToken();
             _ = int.TryParse(_configuration["JWT:RefreshTokenExpirationTimeInDays"], out int refreshTokenExpirationTimeInDays);
             user.RefreshTokenExpirationTime = DateTime.Now.AddDays(refreshTokenExpirationTimeInDays);
-            _context.SaveChanges();
+
+            _unitOfWork.Commit();
 
             var refreshTokenVM = _mapper.Map<RefreshTokenViewModel>(user);
             refreshTokenVM.TokenJWT = _authService.GenerateJWT(user.Email!, user.Username!);
